@@ -11,6 +11,7 @@ export const discordVerify = createMiddleware(async (c, next) => {
     }
 
 	const signature = req.header('X-Signature-Ed25519');
+	console.log(c.json(req)) // comment this line after debugging, I need to know why I'm not getting a const signature
 	if (!signature) return c.json({err: "Signature not filled"}, { status: 403 })
 
 	const timestamp = req.header('X-Signature-Timestamp');
