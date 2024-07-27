@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { InteractionResponseType, InteractionType } from "discord-interactions";
+import { InteractionResponseType, InteractionType, verifyKeyMiddleware } from "discord-interactions";
 import { COMMAND_LIST } from "./commands"; // Modify commands here
 import { discordVerify } from "./helpers"; // No need to look here
 
@@ -12,9 +12,7 @@ type Bindings = {
 const DISCORD_BASE_URI = "https://discord.com/api";
 
 // Consume the environment variables
-const app = new Hono<{ Bindings: Bindings }>() 
-// Disregard this, not relevant as of the moment
-app.use((c, next) => discordVerify(c, next)) 
+const app = new Hono<{ Bindings: Bindings }>()
 
 app.get("/setup", async (c) => {
 	// Grab the secrets from the environment
@@ -38,7 +36,7 @@ app.get("/setup", async (c) => {
 	return c.json(body) // c.json() handles serialization into JSON for us
 })
 
-app.post("/", async (c) => {
+app.post("/interactions", async (c) => {
 	console.log(c);
 	
 	// Get the Request object from the Context object (c.req)
@@ -108,6 +106,6 @@ app.post("/", async (c) => {
 	return c.json({ msg: "Default interaction return" }, { headers: { "Content-type": "application/json" } })
 })
 
-app.get("/", c => c.json({ msg: "Rambot Interaction API Working" }))
+app.get("/interactions", c => c.json({ msg: "Rambot Interaction API Working" }))
 
 export default app

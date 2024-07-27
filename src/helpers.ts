@@ -10,12 +10,12 @@ export const discordVerify = createMiddleware(async (c, next) => {
         return c.json({err: "Discord public key not set"}, { status: 500 })
     }
 
+	const timestamp = req.header('X-Signature-Timestamp');
+	if (!timestamp) return c.json({err: "Timestamp not filled"}, { status: 403 })
+
 	const signature = req.header('X-Signature-Ed25519');
 	console.log(c.json(req)) // comment this line after debugging, I need to know why I'm not getting a const signature
 	if (!signature) return c.json({err: "Signature not filled"}, { status: 403 })
-
-	const timestamp = req.header('X-Signature-Timestamp');
-	if (!timestamp) return c.json({err: "Timestamp not filled"}, { status: 403 })
 
 	const isValidRequest = await verifyKey(await req.text(), signature, timestamp, DISCORD_PUB_KEY)
 	if (!isValidRequest) {
