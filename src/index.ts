@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { InteractionResponseType, InteractionType, verifyKeyMiddleware } from "discord-interactions";
-import { COMMAND_LIST } from "./commands"; // Modify commands here
+import { COMMANDS } from "./commands"; // Modify commands here
 import { discordVerify } from "./helpers"; // No need to look here
 
 type Bindings = {
@@ -25,7 +25,7 @@ app.get("/setup", async (c) => {
 		method: "POST",
 		/* We have to serialize the COMMANDS JS Object into JSON (JS -> JSON) using JSON.stringify() because it is going outward from our system. 
 		We need to serialize into JSON whenever it is going out of our application, and deserialize (parse) into JSON when using it inside the application */
-		body: JSON.stringify(COMMAND_LIST), 
+		body: JSON.stringify(COMMANDS), 
 		headers: {
 			"Authorization": `Bot ${DISCORD_TOKEN}`,
 			"Content-type": "application/json"
@@ -36,7 +36,7 @@ app.get("/setup", async (c) => {
 	return c.json(body) // c.json() handles serialization into JSON for us
 })
 
-app.post("/interactions", async (c) => {
+app.post("/", async (c) => {
 	console.log(c);
 	
 	// Get the Request object from the Context object (c.req)
@@ -106,6 +106,11 @@ app.post("/interactions", async (c) => {
 	return c.json({ msg: "Default interaction return" }, { headers: { "Content-type": "application/json" } })
 })
 
-app.get("/interactions", c => c.json({ msg: "Rambot Interaction API Working" }))
+app.get("/", c => c.json({ msg: "Rambot Interaction API Working" }))
+
+//v moved this line here from line 15 in order to display the working message instead, but should still work(?) - ram
+// Disregard this, not relevant as of the moment
+app.use((c, next) => discordVerify(c, next)) 
+//^
 
 export default app
