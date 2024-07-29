@@ -7,7 +7,6 @@ type Bindings = {
 	DISCORD_APP_ID: string;
 	DISCORD_TOKEN: string;
 	DISCORD_PUB_KEY: string;
-	GUILD_ID: string;
 }
 
 const DISCORD_BASE_URI = "https://discord.com/api";
@@ -17,7 +16,7 @@ const app = new Hono<{ Bindings: Bindings }>()
 
 app.get("/setup", async (c) => {
 	// Grab the secrets from the environment
-	const { DISCORD_APP_ID, DISCORD_TOKEN, GUILD_ID } = c.env
+	const { DISCORD_APP_ID, DISCORD_TOKEN } = c.env
 
 	// String formatting with variable values. NOTE: tilde instead of quote marks
 	const url = `${DISCORD_BASE_URI}/v10/applications/${DISCORD_APP_ID}/commands`
@@ -44,6 +43,7 @@ app.get("/setup", async (c) => {
 app.get("/", c => c.json({ msg: "Rambot Interaction API Working" }))
 
 //v moved this line here from line 15 in order to display the working message instead, but should still work(?) - ram -- nevermind it doesnt i moved it back. should look into how to fix the bot showing this 
+//fixed post-review by jm, also moved the above app.get line, it's only important that this is before the endpoint app.post
 // Disregard this, not relevant as of the moment
 app.use((c, next) => discordVerify(c, next)) 
 //^
@@ -78,84 +78,68 @@ app.post("/", async (c) => {
 			})
 		}
 		case InteractionType.APPLICATION_COMMAND: {
-			//check command name? -ram
+			//check command name
 			const { name } = data
+			switch ( name ) {
+				case ( 'test' ) :
+					//send message
+					return c.json({
+						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+						data: {
+							tts: false,
+							content: "Test works!",
+							embeds: [],
+							allowed_mentions: { parse: [] }
+						},
+					})
 
-			if (name == "test") {
-				//send message
-				return c.json({
-					type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-					data: {
-						tts: false,
-						content: "Congrats on sending your command!",
-						embeds: [],
-						allowed_mentions: { parse: [] }
-					},
-				})
-			}
-			if (name=="button") {
-				//we use this space to work on the command for now, i cant get the other commands to register in discord for some reason
-				let x : any
-				const jikanreq = await fetch(`https://api.jikan.moe/v4/top/anime`)
-				x = await jikanreq.json()
-				console.log(x.data[0].titles[0])
-				
-				return c.json({
-					type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-					data: {
-						tts: false,
-						content: JSON.stringify(x.data[0].titles[0].title),
-						embeds: [],
-						allowed_mentions: { parse: [] }
-					},
-				})
-				
-				//make button, does nothing
-				return c.json({
-					type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-					data: {
-						tts: false,
-						components: [
-							{
-								type: 1,
-								components: [
-									{
-										type: 2,
-										label: "Click me! TESTING2",
-										style: 1,
-										custom_id: "click_one"
-									}
-								]
-							}
-						],
-						embeds: [],
-						allowed_mentions: { parse: [] }
-					}
-				})
-			}
-			if (name=="testbutton") {
-				//make button, does nothing
-				return c.json({
-					type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-					data: {
-						tts: false,
-						components: [
-							{
-								type: 1,
-								components: [
-									{
-										type: 2,
-										label: "testbuttonworks...",
-										style: 1,
-										custom_id: "click_one"
-									}
-								]
-							}
-						],
-						embeds: [],
-						allowed_mentions: { parse: [] }
-					}
-				})
+				case ( 'button' ) :			
+					//make button, does nothing
+					return c.json({
+						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+						data: {
+							tts: false,
+							components: [
+								{
+									type: 1,
+									components: [
+										{
+											type: 2,
+											label: "Click me! TESTING2",
+											style: 1,
+											custom_id: "click_one"
+										}
+									]
+								}
+							],
+							embeds: [],
+							allowed_mentions: { parse: [] }
+						}
+					})
+
+				case ( 'create_task' ) :
+					//make button, does nothing
+					return c.json({
+						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+						data: {
+							tts: false,
+							components: [
+								{
+									type: 1,
+									components: [
+										{
+											type: 2,
+											label: "testbuttonworks...",
+											style: 1,
+											custom_id: "click_one"
+										}
+									]
+								}
+							],
+							embeds: [],
+							allowed_mentions: { parse: [] }
+						}
+					})
 			}
 		}
 	}

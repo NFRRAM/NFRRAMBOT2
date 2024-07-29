@@ -12,9 +12,9 @@ const BUTTON = {
     ]
 }
 
-const TESTBUTTON = {
-    name: "testbutton",
-    description: "Creates ANOTHER button",
+const CREATE_TASK = {
+    name: "create_task",
+    description: "Creates a task in ClickUp",
     options: [
         /*
             {
@@ -34,5 +34,5 @@ const TEST = {
 export const COMMAND_LIST = [
     TEST,
     BUTTON,
-    TESTBUTTON,
+    CREATE_TASK,
 ];
