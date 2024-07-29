@@ -15,7 +15,8 @@ export const discordVerify = createMiddleware(async (c, next) => {
 
 	const signature = req.header('X-Signature-Ed25519');
 	// console.log(c.json(req)) // comment this line after debugging, I need to know why I'm not getting a const signature -its because only discord sends it when verifying. idk why it isnt saved
-	// - I guess it doesnt need to be saved. dunno why the endpoint is verified even without it
+	// - I guess it doesnt need to be saved. dunno why the endpoint is verified even without it - it's not. discord disabled my shit and then we had to move this up.
+	// THE IMPORTANT THING ABOUT THIS PART IS THAT IT NEEDS TO BE RUN WITH APP.USE BEFORE THE INTERACTION APP.POST
 	if (!signature) return c.json({err: "Signature not filled"}, { status: 403 })
 
 	const isValidRequest = await verifyKey(await req.text(), signature, timestamp, DISCORD_PUB_KEY)

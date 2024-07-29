@@ -15,22 +15,17 @@ const DISCORD_BASE_URI = "https://discord.com/api";
 // Consume the environment variables
 const app = new Hono<{ Bindings: Bindings }>()
 
-//v moved this line here from line 15 in order to display the working message instead, but should still work(?) - ram -- nevermind it doesnt i moved it back. should look into how to fix the bot showing this 
-// Disregard this, not relevant as of the moment
-app.use((c, next) => discordVerify(c, next)) 
-//^
-
 app.get("/setup", async (c) => {
 	// Grab the secrets from the environment
 	const { DISCORD_APP_ID, DISCORD_TOKEN, GUILD_ID } = c.env
 
 	// String formatting with variable values. NOTE: tilde instead of quote marks
-	const url = `${DISCORD_BASE_URI}/v10/applications/${DISCORD_APP_ID}/guilds/${GUILD_ID}/commands`
+	const url = `${DISCORD_BASE_URI}/v10/applications/${DISCORD_APP_ID}/commands`
 	//edited URL to change scope to guild commands to see if it updates slash commands faster than application commands -ram
 	//old URL (check docs) : `${DISCORD_BASE_URI}/v10/applications/${DISCORD_APP_ID}/commands`
 
 	const req = await fetch(url, {
-		method: "POST",
+		method: "PUT",
 		/* We have to serialize the COMMANDS JS Object into JSON (JS -> JSON) using JSON.stringify() because it is going outward from our system. 
 		We need to serialize into JSON whenever it is going out of our application, and deserialize (parse) into JSON when using it inside the application */
 		body: JSON.stringify(COMMAND_LIST), 
@@ -41,10 +36,17 @@ app.get("/setup", async (c) => {
 	})
 
 	const body = await req.text()
-	return c.text(JSON.stringify(COMMAND_LIST)) // c.json() handles serialization into JSON for us
+	return c.text(JSON.stringify(body)) // c.json() handles serialization into JSON for us
 	//^ changed to c.text just to show how it works - ram
 	// also remove still testing COMMAND_LIST when we're done
 })
+
+app.get("/", c => c.json({ msg: "Rambot Interaction API Working" }))
+
+//v moved this line here from line 15 in order to display the working message instead, but should still work(?) - ram -- nevermind it doesnt i moved it back. should look into how to fix the bot showing this 
+// Disregard this, not relevant as of the moment
+app.use((c, next) => discordVerify(c, next)) 
+//^
 
 app.post("/", async (c) => {
 	// console.log(c);
@@ -160,7 +162,5 @@ app.post("/", async (c) => {
 
 	return c.json({ msg: "Default interaction return" }, { headers: { "Content-type": "application/json" } })
 })
-
-app.get("/", c => c.json({ msg: "Rambot Interaction API Working" }))
 
 export default app
