@@ -1,6 +1,6 @@
 const BUTTON = {
     name: "button",
-    description: "Creates a button TESTING",
+    description: "Creates a button",
     options: [
         /*
             {
@@ -10,6 +10,17 @@ const BUTTON = {
             }
         */
     ]
+}
+
+const TOP_ANIME = {
+    name: "top_anime",
+    description: "Fetches the nth top anime from Jikan (MAL API)",
+    options: [{
+        name : "N",
+        description : "The #N top anime",
+        type : 4,
+        required : false,
+    }]
 }
 
 const CREATE_TASK = {
@@ -35,4 +46,5 @@ export const COMMAND_LIST = [
     TEST,
     BUTTON,
     CREATE_TASK,
+    TOP_ANIME,
 ];

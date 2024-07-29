@@ -40,7 +40,7 @@ app.get("/setup", async (c) => {
 	// also remove still testing COMMAND_LIST when we're done
 })
 
-app.get("/", c => c.json({ msg: "Rambot Interaction API Working" }))
+app.get("/", c => c.json({ msg: "nfrrambot Interaction API Working" }))
 
 //v moved this line here from line 15 in order to display the working message instead, but should still work(?) - ram -- nevermind it doesnt i moved it back. should look into how to fix the bot showing this 
 //fixed post-review by jm, also moved the above app.get line, it's only important that this is before the endpoint app.post
@@ -83,6 +83,7 @@ app.post("/", async (c) => {
 			switch ( name ) {
 				case ( 'test' ) :
 					//send message
+					console.log(data)
 					return c.json({
 						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
 						data: {
@@ -92,9 +93,26 @@ app.post("/", async (c) => {
 							allowed_mentions: { parse: [] }
 						},
 					})
+				
+				case ( 'top_anime' ) :
+					//fetches top anime from Jikan (MAL_API)
+					const { options } = data
+					const { value } = options[0]
+					let x : any
+					const jikanreq = await fetch(`https://api.jikan.moe/v4/top/anime`)
+					x = await jikanreq.json()
+					return c.json({
+						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+						data: {
+							tts: false,
+							content: JSON.stringify(x.data[value-1].titles[0].title), //gets the default title of the #n top anime
+							embeds: [],
+							allowed_mentions: { parse: [] }
+						},
+					})
 
-				case ( 'button' ) :			
-					//make button, does nothing
+				case ( 'button' ) :
+					//makes a button that does nothing
 					return c.json({
 						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
 						data: {
@@ -105,7 +123,7 @@ app.post("/", async (c) => {
 									components: [
 										{
 											type: 2,
-											label: "Click me! TESTING2",
+											label: "Click me!",
 											style: 1,
 											custom_id: "click_one"
 										}
