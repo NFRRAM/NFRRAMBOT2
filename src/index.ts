@@ -175,33 +175,6 @@ app.post("/", async (c) => {
 					})
 				}
 
-				case ( 'create_task' ) : {
-					//make button, does nothing
-					const { options } = data
-
-					return c.json({
-						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-						data: {
-							tts: false,
-							components: [
-								{
-									type: 1,
-									components: [
-										{
-											type: 2,
-											label: "testbuttonworks...",
-											style: 1,
-											custom_id: "click_one"
-										}
-									]
-								}
-							],
-							embeds: [],
-							allowed_mentions: { parse: [] }
-						}
-					})
-				}
-
 				case ( 'find_workspaces' ) : {
 					//finds available workspaces
 					const { CLICKUP_TOKEN } = c.env
@@ -296,11 +269,14 @@ app.post("/", async (c) => {
 
 				case ( 'find_lists' ) : {
 					//finds available lists, either using a folder or a space
-					console.log(data)
-					if (data.options[0].value) { // folderless is true
+					const { options } = data
+					if (options[0].value) { // folderless is true
 						const query = new URLSearchParams({archived : 'false'}).toString()
 						const { CLICKUP_TOKEN } = c.env
-						const space_id = data.options[1].value
+						const space_id_obj = options.filter(function(optionlist : any) {
+							return optionlist.name == 'space_id'
+						})
+						const space_id = space_id_obj[0].value
 						const req = await fetch(
 							`https://api.clickup.com/api/v2/space/${space_id}/list?${query}`,
 							{
@@ -330,7 +306,11 @@ app.post("/", async (c) => {
 					else { // folderless is false
 						const query = new URLSearchParams({archived : 'false'}).toString()
 						const { CLICKUP_TOKEN } = c.env
-						const folder_id = data.options[1].value
+						const folder_id_obj = options.filter(function(optionlist : any) {
+							return optionlist.name == 'folder_id'
+						})
+						const folder_id = folder_id_obj[0].value
+						console.log(folder_id_obj)
 						const req = await fetch(
 							`https://api.clickup.com/api/v2/folder/${folder_id}/list?${query}`,
 							{
@@ -356,6 +336,32 @@ app.post("/", async (c) => {
 							},
 						})
 					}
+				}
+
+				case ( 'create_task' ) : {
+					//make button, does nothing
+					const { options } = data
+					return c.json({
+						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+						data: {
+							tts: false,
+							components: [
+								{
+									type: 1,
+									components: [
+										{
+											type: 2,
+											label: "testbuttonworks...",
+											style: 1,
+											custom_id: "click_one"
+										}
+									]
+								}
+							],
+							embeds: [],
+							allowed_mentions: { parse: [] }
+						}
+					})
 				}
 			}
 		}
