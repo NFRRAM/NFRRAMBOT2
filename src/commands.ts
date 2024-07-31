@@ -66,6 +66,52 @@ const CREATE_TASK = {
             required : false,
         },
         {
+            name : "tag_names",
+            description : "Tag names for task seperated by COMMAS (AND NOT SPACES)",
+            type : 3,
+            required : false,
+        },
+        {
+            name : "priority",
+            description : "Priority of task (1-4, High to Low)",
+            type : 4,
+            required : false,
+        },
+        {
+            name : "sprint_points",
+            description : "Adds Sprint Points to the task (1,2,3,5,8)",
+            type : 4,
+            choices : [
+                {
+                    name : '1',
+                    value : 1,
+                },
+                {
+                    name : '2',
+                    value : 2,
+                },
+                {
+                    name : '3',
+                    value : 3,
+                },
+                {
+                    name : '5',
+                    value : 5,
+                },
+                {
+                    name : '8',
+                    value : 8,
+                },
+            ],
+            required : false,
+        },
+        {
+            name : "status_name",
+            description : "Name of status to add the task to",
+            type : 3,
+            required : false,
+        },
+        {
             name : "custom_task_id",
             description : "Custom task ID NOT BEING USED AS OF THE MOMENT",
             type : 4,
