@@ -35,6 +35,31 @@ const CREATE_TASK = {
             type : 4,
             required : true,
         },
+        {
+            name : "task_name",
+            description : "Name for the new task",
+            type : 3,
+            required : true,
+        },
+        {
+            name : "task_desc",
+            description : "Description for the new task",
+            type : 3,
+            required : false,
+        },
+        {
+            name : "custom_task_id",
+            description : "Custom task ID NOT BEING USED AS OF THE MOMENT",
+            type : 4,
+            required : false,
+        },
+        {
+            name : "workspace_id",
+            description : "ClickUp docs say we need this for custom task ids. NOT BEING USED AS OF THE MOMENT",
+            type : 4,
+            required : false,
+
+        },
     ]
 }
 

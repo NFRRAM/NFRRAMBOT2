@@ -15,6 +15,15 @@ const DISCORD_BASE_URI = "https://discord.com/api";
 // Consume the environment variables
 const app = new Hono<{ Bindings: Bindings }>()
 
+function findObjValueFromObjList(name : string, list : Array<any>){
+	// this function returns the value of the value key from the object
+	// with a matching name key from a list containing the objects
+	const objlist = list.filter(function(objects : any) {
+		return objects.name == `${name}`
+	})
+	return objlist[0].value
+}
+
 app.get("/setup", async (c) => {
 	// Grab the secrets from the environment
 	const { DISCORD_APP_ID, DISCORD_TOKEN } = c.env
@@ -273,10 +282,7 @@ app.post("/", async (c) => {
 					if (options[0].value) { // folderless is true
 						const query = new URLSearchParams({archived : 'false'}).toString()
 						const { CLICKUP_TOKEN } = c.env
-						const space_id_obj = options.filter(function(optionlist : any) {
-							return optionlist.name == 'space_id'
-						})
-						const space_id = space_id_obj[0].value
+						const space_id = findObjValueFromObjList('space_id',options)
 						const req = await fetch(
 							`https://api.clickup.com/api/v2/space/${space_id}/list?${query}`,
 							{
@@ -306,11 +312,7 @@ app.post("/", async (c) => {
 					else { // folderless is false
 						const query = new URLSearchParams({archived : 'false'}).toString()
 						const { CLICKUP_TOKEN } = c.env
-						const folder_id_obj = options.filter(function(optionlist : any) {
-							return optionlist.name == 'folder_id'
-						})
-						const folder_id = folder_id_obj[0].value
-						console.log(folder_id_obj)
+						const folder_id = findObjValueFromObjList('folder_id',options)
 						const req = await fetch(
 							`https://api.clickup.com/api/v2/folder/${folder_id}/list?${query}`,
 							{
@@ -341,6 +343,36 @@ app.post("/", async (c) => {
 				case ( 'create_task' ) : {
 					//make button, does nothing
 					const { options } = data
+					const { list_id } = options[0].value
+					const { task_name } = options[1].value
+					const task_desc = findObjValueFromObjList('task_desc',options)
+					const { CLICKUP_TOKEN } = c.env
+					/*
+					v from ClickUp Docs, need to look up wtf custom task ids are for and
+					why i need to put the team id
+					oh my god i just realized its probably because it needs to make sure
+					that it's the only one in the workspace
+					*/
+					// const query = new URLSearchParams({
+					// 	custom_task_id : 'true',
+					// 	team_id : '123'
+					// }).toString()
+					const req = await fetch(
+						//`https://api.clickup.com/api/v2/list/${list_id}/task?${query}`
+						`https://api.clickup.com/api/v2/list/${list_id}/task`,
+						{
+							method : 'POST',
+							headers : {
+								'Content-Type' : 'application/json',
+								Authorization : `${CLICKUP_TOKEN}`,
+							},
+							body : JSON.stringify({
+								name : `${task_name}`,
+								description : `${task_desc}`,
+
+							})
+						}
+					)
 					return c.json({
 						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
 						data: {
