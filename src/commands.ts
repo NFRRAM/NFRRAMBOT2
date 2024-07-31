@@ -98,7 +98,7 @@ const FIND_FOLDERS = {
 
 const FIND_LISTS = {
     name: "find_lists",
-    description: "Find lists that I can use",
+    description: "Find lists inside either a specific folder or a specific space",
     options: [
         {
             name : "folderless",
@@ -121,6 +121,19 @@ const FIND_LISTS = {
     ]
 }
 
+const FIND_USERS = {
+    name: "find_users",
+    description: "Find users in a specific workspace",
+    options: [
+        {
+            name : 'team_id',
+            description : 'Workspace ID to find spaces in',
+            type : 4,
+            required : true,
+        }
+    ]
+}
+
 const TEST = {
     name: "test",
     description: "sends a message back from discord bot TESTING TESTING"
@@ -135,4 +148,5 @@ export const COMMAND_LIST = [
     FIND_SPACES,
     FIND_FOLDERS,
     FIND_LISTS,
+    FIND_USERS
 ];

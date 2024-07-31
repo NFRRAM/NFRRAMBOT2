@@ -24,6 +24,15 @@ function findObjValueFromObjList(name : string, list : Array<any>){
 	return objlist[0].value
 }
 
+function findObjFromObjList(id : number, list : Array<any>){
+	// this function returns the object
+	// with a matching ID key from a list containing the objects
+	const objlist = list.filter(function(objects : any) {
+		return objects.id == `${id}`
+	})
+	return objlist[0]
+}
+
 app.get("/setup", async (c) => {
 	// Grab the secrets from the environment
 	const { DISCORD_APP_ID, DISCORD_TOKEN } = c.env
@@ -184,6 +193,39 @@ app.post("/", async (c) => {
 					})
 				}
 
+				case ( 'find_users' ) : {
+					//finds available workspaces
+					const { options } = data
+					const team_id = findObjValueFromObjList('team_id',options)
+					const { CLICKUP_TOKEN } = c.env
+					const req = await fetch(
+						'https://api.clickup.com/api/v2/team',
+						{
+							method : 'GET',
+							headers : {
+								Authorization : `${CLICKUP_TOKEN}`
+							}
+						}
+					)
+					const workspaces = await req.json() as any
+					const workspace = findObjFromObjList(team_id,workspaces.teams)
+					const { members } = workspace
+					console.log(workspace)
+					let msg = `Here are the users we found in the workspace with ID ${team_id}:\n`
+					for (let i = 0; i < members.length; i++){
+						msg = msg.concat(`${members[i].user.username} with ID number: ${members[i].user.id}\n`)
+					}
+					return c.json({
+						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+						data: {
+							tts: false,
+							content: msg,
+							embeds: [],
+							allowed_mentions: { parse: [] }
+						},
+					})
+				}
+
 				case ( 'find_workspaces' ) : {
 					//finds available workspaces
 					const { CLICKUP_TOKEN } = c.env
@@ -197,7 +239,6 @@ app.post("/", async (c) => {
 						}
 					)
 					const workspaces = await req.json() as any
-					console.log(workspaces)
 					const { teams } = workspaces
 					let msg = 'Here are the workspaces we found using your ClickUp key:\n'
 					for (let i = 0; i < teams.length; i++){
@@ -343,8 +384,8 @@ app.post("/", async (c) => {
 				case ( 'create_task' ) : {
 					//make button, does nothing
 					const { options } = data
-					const { list_id } = options[0].value
-					const { task_name } = options[1].value
+					const list_id = findObjValueFromObjList('list_id',options)
+					const task_name = findObjValueFromObjList('task_name',options)
 					const task_desc = findObjValueFromObjList('task_desc',options)
 					const { CLICKUP_TOKEN } = c.env
 					/*
@@ -369,7 +410,10 @@ app.post("/", async (c) => {
 							body : JSON.stringify({
 								name : `${task_name}`,
 								description : `${task_desc}`,
-
+								markdown_description : `${task_desc}`, // not sure what makes this different from description, might need to check that
+								assignees : [183], //idk this was in the sample
+								archived : false,
+								group_assignees : []
 							})
 						}
 					)
