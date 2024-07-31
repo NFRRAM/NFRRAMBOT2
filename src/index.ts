@@ -15,13 +15,28 @@ const DISCORD_BASE_URI = "https://discord.com/api";
 // Consume the environment variables
 const app = new Hono<{ Bindings: Bindings }>()
 
-function findObjValueFromObjList(name : string, list : Array<any>){
+function findObjValueFromObjList(name : string, list : Array<any>, type : object){
 	// this function returns the value of the value key from the object
 	// with a matching name key from a list containing the objects
+
+	// note: applies non-required options if they exist,
+	// otherwise, returns default values
+	// default false for boolean, 0 for number
+
 	const objlist = list.filter(function(objects : any) {
 		return objects.name == `${name}`
 	})
-	return objlist[0].value
+	if (objlist.length == 0) {
+		switch (type) {
+			case ( String ):
+				return ''
+			case ( Number ):
+				return 0
+			case ( Boolean ):
+				return false
+		}
+	}
+	else return objlist[0].value
 }
 
 function findObjFromObjList(id : number, list : Array<any>){
@@ -52,12 +67,6 @@ app.get("/setup", async (c) => {
 			"Content-type": "application/json"
 		}
 	})
-
-	// if (!req.ok) {
-	// 	const err = await req.json()
-	// 	console.error(err)
-	// 	return c.text(JSON.stringify(req))
-	// }
 
 	const body = await req.text()
 	return c.text(JSON.stringify(body)) // c.json() handles serialization into JSON for us
@@ -153,15 +162,16 @@ app.post("/", async (c) => {
 
 				case ( 'top_anime' ) : {
 					//fetches top anime from Jikan (MAL_API)
-					const { value } = data.options[0]
+					const {options} = data
+					const n = findObjValueFromObjList('n',options,Number)
 					const jikanreq = await fetch(`https://api.jikan.moe/v4/top/anime`)
 					const anime = await jikanreq.json() as any
-					const topAnime = JSON.stringify(anime.data[value-1].titles[0].title) //gets the default title of the #n top anime
+					const topAnime = JSON.stringify(anime.data[n-1].titles[0].title) //gets the default title of the #n top anime
 					return c.json({
 						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
 						data: {
 							tts: false,
-							content: `The number ${value} top anime is ${topAnime}`,
+							content: `The number ${n} top anime is ${topAnime}`,
 							embeds: [],
 							allowed_mentions: { parse: [] }
 						},
@@ -196,7 +206,7 @@ app.post("/", async (c) => {
 				case ( 'find_users' ) : {
 					//finds available workspaces
 					const { options } = data
-					const team_id = findObjValueFromObjList('team_id',options)
+					const team_id = findObjValueFromObjList('team_id',options,Number)
 					const { CLICKUP_TOKEN } = c.env
 					const req = await fetch(
 						'https://api.clickup.com/api/v2/team',
@@ -256,9 +266,10 @@ app.post("/", async (c) => {
 
 				case ( 'find_spaces' ) : {
 					//finds available spaces within a workspace (team)
+					const { options } = data
 					const query = new URLSearchParams({archived : 'false'}).toString()
 					const { CLICKUP_TOKEN } = c.env
-					const team_id = data.options[0].value
+					const team_id = findObjValueFromObjList('team_id',options,Number)
 					const req = await fetch(
 						`https://api.clickup.com/api/v2/team/${team_id}/space?${query}`,
 						{
@@ -271,7 +282,7 @@ app.post("/", async (c) => {
 					const spacelist = await req.json() as any
 					const { spaces } = spacelist
 					let msg = `Here are the spaces we found inside workspace ID ${team_id}:\n`
-					for (let i = 0; i < spaces.length; i++){
+					for (let i = 0; i < spaces.length; i++) {
 						msg = msg.concat(`${spaces[i].name} with ID number: ${spaces[i].id}\n`)
 					}
 					return c.json({
@@ -287,9 +298,10 @@ app.post("/", async (c) => {
 
 				case ( 'find_folders' ) : {
 					//finds available folders within a space
+					const { options } = data
 					const query = new URLSearchParams({archived : 'false'}).toString()
 					const { CLICKUP_TOKEN } = c.env
-					const space_id = data.options[0].value
+					const space_id = findObjValueFromObjList('space_id',options,Number)
 					const req = await fetch(
 						`https://api.clickup.com/api/v2/space/${space_id}/folder?${query}`,
 						{
@@ -319,10 +331,11 @@ app.post("/", async (c) => {
 				case ( 'find_lists' ) : {
 					//finds available lists, either using a folder or a space
 					const { options } = data
-					if (options[0].value) { // folderless is true
+					const folderless = findObjValueFromObjList('folderless',options,Boolean)
+					if (folderless) { // folderless is true
 						const query = new URLSearchParams({archived : 'false'}).toString()
 						const { CLICKUP_TOKEN } = c.env
-						const space_id = findObjValueFromObjList('space_id',options)
+						const space_id = findObjValueFromObjList('space_id',options,Number)
 						const req = await fetch(
 							`https://api.clickup.com/api/v2/space/${space_id}/list?${query}`,
 							{
@@ -350,11 +363,9 @@ app.post("/", async (c) => {
 					}
 
 					else { // folderless is false
-						console.log(data) // i need to find out whats happening to create_task and why its telling me cant read properties of undefined
 						const query = new URLSearchParams({archived : 'false'}).toString()
 						const { CLICKUP_TOKEN } = c.env
-						const folder_id = findObjValueFromObjList('folder_id',options)
-						console.log(folder_id) // same as previous comment
+						const folder_id = findObjValueFromObjList('folder_id',options,Number)
 						const req = await fetch(
 							`https://api.clickup.com/api/v2/folder/${folder_id}/list?${query}`,
 							{
@@ -385,12 +396,12 @@ app.post("/", async (c) => {
 				case ( 'create_task' ) : {
 					//creates task
 					const { options } = data
-					const list_id = findObjValueFromObjList('list_id',options)
+					const list_id = findObjValueFromObjList('list_id',options,Number)
 					// console.log(list_id)
-					const task_name = findObjValueFromObjList('task_name',options)
+					const task_name = findObjValueFromObjList('task_name',options,String)
 					// console.log(task_name)
-					// the line below actually errors if you don't pass a task_desc. todo: fix
-					const task_desc = findObjValueFromObjList('task_desc',options)
+					// Try to apply non-required options
+					const task_desc = findObjValueFromObjList('task_desc',options,String)
 					// console.log(task_desc)
 					const { CLICKUP_TOKEN } = c.env
 					/*
@@ -403,14 +414,14 @@ app.post("/", async (c) => {
 					// 	custom_task_id : 'true',
 					// 	team_id : '123'
 					// }).toString()
-					const assignees = findObjValueFromObjList('assignees',options)
+					const assignees = findObjValueFromObjList('assignees',options,String)
 					let assignee_list = assignees.split(',')
 					for (let i=0;i<assignee_list.length;i++){
 						assignee_list[0] = Number(assignee_list[0])
 					}
-					const due_date = findObjValueFromObjList('due_date',options)
+					const due_date = findObjValueFromObjList('due_date',options,String)
 					const due_date_unix = parseInt((new Date(due_date).getTime() / 1000).toFixed(0)) // this actually converts to unix timestamp supposedly
-					const start_date = findObjValueFromObjList('start_date',options)
+					const start_date = findObjValueFromObjList('start_date',options,String)
 					const start_date_unix = parseInt((new Date(start_date).getTime() / 1000).toFixed(0)) // this actually converts to unix timestamp supposedly
 					const req = await fetch(
 						//`https://api.clickup.com/api/v2/list/${list_id}/task?${query}`

@@ -27,7 +27,7 @@ const TOP_ANIME = {
 
 const CREATE_TASK = {
     name: "create_task",
-    description: "Creates a task in ClickUp",
+    description: "Creates a task for a specific list in ClickUp",
     options: [
         {
             name : "list_id",
@@ -45,19 +45,19 @@ const CREATE_TASK = {
             name : "assignees",
             description : "assignee IDs, seperated by commas (if more than one) AND NO SPACES(?)",
             type : 3,
-            required : true,
+            required : false,
         },
         {
             name : "due_date",
             description : "YYYY.MM.DD",
             type : 3,
-            required : true,
+            required : false,
         },
         {
             name : "start_date",
             description : "YYYY.MM.DD",
             type : 3,
-            required : true,
+            required : false,
         },
         {
             name : "task_desc",
