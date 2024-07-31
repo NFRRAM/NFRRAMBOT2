@@ -82,14 +82,14 @@ const FIND_LISTS = {
             required : true,
         },
         {
-            name : "folder",
-            description : "Set folder id",
+            name : "folder_id",
+            description : "Set folder ID (ONLY IF FOLDERLESS IS FALSE)",
             type : 4,
             required : false,
         },
         {
-            name : "space",
-            description : "Set space id",
+            name : "space_id",
+            description : "Set space id (ONLY IF FOLDERLESS IS TRUE)",
             type : 4,
             required : false,
         },
