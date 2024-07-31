@@ -217,7 +217,7 @@ app.post("/", async (c) => {
 					const workspaces = await req.json() as any
 					console.log(workspaces)
 					const { teams } = workspaces
-					let msg = 'Here are the workspaces we found:\n'
+					let msg = 'Here are the workspaces we found using your ClickUp key:\n'
 					for (let i = 0; i < teams.length; i++){
 						msg = msg.concat(`${teams[i].name} with ID number ${teams[i].id}\n`)
 					}
@@ -233,7 +233,7 @@ app.post("/", async (c) => {
 				}
 
 				case ( 'find_spaces' ) : {
-					//finds available spaces
+					//finds available spaces within a workspace (team)
 					const query = new URLSearchParams({archived : 'false'}).toString()
 					const { CLICKUP_TOKEN } = c.env
 					const team_id = data.options[0].value
@@ -247,9 +247,8 @@ app.post("/", async (c) => {
 						}
 					)
 					const spacelist = await req.json() as any
-					console.log(data)
 					const { spaces } = spacelist
-					let msg = 'Here are the spaces we found:\n'
+					let msg = `Here are the spaces we found inside workspace ID ${team_id}:\n`
 					for (let i = 0; i < spaces.length; i++){
 						msg = msg.concat(`${spaces[i].name} with ID number: ${spaces[i].id}\n`)
 					}
@@ -262,6 +261,101 @@ app.post("/", async (c) => {
 							allowed_mentions: { parse: [] }
 						},
 					})
+				}
+
+				case ( 'find_folders' ) : {
+					//finds available folders within a space
+					const query = new URLSearchParams({archived : 'false'}).toString()
+					const { CLICKUP_TOKEN } = c.env
+					const space_id = data.options[0].value
+					const req = await fetch(
+						`https://api.clickup.com/api/v2/space/${space_id}/folder?${query}`,
+						{
+							method : 'GET',
+							headers : {
+								Authorization : `${CLICKUP_TOKEN}`
+							}
+						}
+					)
+					const folderlist = await req.json() as any
+					const { folders } = folderlist
+					let msg = `Here are the folders we found inside space ID ${space_id}:\n`
+					for (let i = 0; i < folders.length; i++){
+						msg = msg.concat(`${folders[i].name} with ID number: ${folders[i].id}\n`)
+					}
+					return c.json({
+						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+						data: {
+							tts: false,
+							content: msg,
+							embeds: [],
+							allowed_mentions: { parse: [] }
+						},
+					})
+				}
+
+				case ( 'find_lists' ) : {
+					//finds available lists, either using a folder or a space
+					console.log(data)
+					if (data.options[0].value) { // folderless is true
+						const query = new URLSearchParams({archived : 'false'}).toString()
+						const { CLICKUP_TOKEN } = c.env
+						const space_id = data.options[1].value
+						const req = await fetch(
+							`https://api.clickup.com/api/v2/space/${space_id}/list?${query}`,
+							{
+								method : 'GET',
+								headers : {
+									Authorization : `${CLICKUP_TOKEN}`
+								}
+							}
+						)
+						const listlist = await req.json() as any
+						const { lists } = listlist
+						let msg = `Here are the folderless lists we found inside space ID ${space_id}:\n`
+						for (let i = 0; i < lists.length; i++){
+							msg = msg.concat(`${lists[i].name} with ID number: ${lists[i].id}\n`)
+						}
+						return c.json({
+							type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+							data: {
+								tts: false,
+								content: msg,
+								embeds: [],
+								allowed_mentions: { parse: [] }
+							},
+						})
+					}
+
+					else { // folderless is false
+						const query = new URLSearchParams({archived : 'false'}).toString()
+						const { CLICKUP_TOKEN } = c.env
+						const folder_id = data.options[1].value
+						const req = await fetch(
+							`https://api.clickup.com/api/v2/folder/${folder_id}/list?${query}`,
+							{
+								method : 'GET',
+								headers : {
+									Authorization : `${CLICKUP_TOKEN}`
+								}
+							}
+						)
+						const listlist = await req.json() as any
+						const { lists } = listlist
+						let msg = `Here are the lists we found inside folder ID ${folder_id}:\n`
+						for (let i = 0; i < lists.length; i++){
+							msg = msg.concat(`${lists[i].name} with ID number: ${lists[i].id}\n`)
+						}
+						return c.json({
+							type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+							data: {
+								tts: false,
+								content: msg,
+								embeds: [],
+								allowed_mentions: { parse: [] }
+							},
+						})
+					}
 				}
 			}
 		}

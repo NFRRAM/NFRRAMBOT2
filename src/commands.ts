@@ -34,7 +34,7 @@ const CREATE_TASK = {
             description : "ID for list to make task in",
             type : 4,
             required : true,
-        }
+        },
     ]
 }
 
