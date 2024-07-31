@@ -7,6 +7,7 @@ type Bindings = {
 	DISCORD_APP_ID: string;
 	DISCORD_TOKEN: string;
 	DISCORD_PUB_KEY: string;
+	CLICKUP_TOKEN: string;
 }
 
 const DISCORD_BASE_URI = "https://discord.com/api";
@@ -15,6 +16,38 @@ const DISCORD_BASE_URI = "https://discord.com/api";
 const app = new Hono<{ Bindings: Bindings }>()
 
 app.get("/setup", async (c) => {
+	// Grab the secrets from the environment
+	const { DISCORD_APP_ID, DISCORD_TOKEN } = c.env
+
+	// String formatting with variable values. NOTE: tilde instead of quote marks
+	const url = `${DISCORD_BASE_URI}/v10/applications/${DISCORD_APP_ID}/commands`
+	//edited URL to change scope to guild commands to see if it updates slash commands faster than application commands -ram
+	//old URL (check docs) : `${DISCORD_BASE_URI}/v10/applications/${DISCORD_APP_ID}/commands`
+
+	const req = await fetch(url, {
+		method: "POST",
+		/* We have to serialize the COMMANDS JS Object into JSON (JS -> JSON) using JSON.stringify() because it is going outward from our system. 
+		We need to serialize into JSON whenever it is going out of our application, and deserialize (parse) into JSON when using it inside the application */
+		body: JSON.stringify(COMMAND_LIST), 
+		headers: {
+			"Authorization": `Bot ${DISCORD_TOKEN}`,
+			"Content-type": "application/json"
+		}
+	})
+
+	// if (!req.ok) {
+	// 	const err = await req.json()
+	// 	console.error(err)
+	// 	return c.text(JSON.stringify(req))
+	// }
+
+	const body = await req.text()
+	return c.text(JSON.stringify(body)) // c.json() handles serialization into JSON for us
+	//^ changed to c.text just to show how it works - ram
+})
+
+// This is to update the commands instead if we don't need to send a POST request
+app.get("/update", async (c) => {
 	// Grab the secrets from the environment
 	const { DISCORD_APP_ID, DISCORD_TOKEN } = c.env
 
@@ -34,10 +67,15 @@ app.get("/setup", async (c) => {
 		}
 	})
 
+	if (!req.ok) {
+		const err = await req.json()
+		console.error(err)
+		return c.text("error 500")
+	}
+
 	const body = await req.text()
 	return c.text(JSON.stringify(body)) // c.json() handles serialization into JSON for us
 	//^ changed to c.text just to show how it works - ram
-	// also remove still testing COMMAND_LIST when we're done
 })
 
 app.get("/", c => c.json({ msg: "nfrrambot Interaction API Working" }))
@@ -45,7 +83,7 @@ app.get("/", c => c.json({ msg: "nfrrambot Interaction API Working" }))
 //v moved this line here from line 15 in order to display the working message instead, but should still work(?) - ram -- nevermind it doesnt i moved it back. should look into how to fix the bot showing this 
 //fixed post-review by jm, also moved the above app.get line, it's only important that this is before the endpoint app.post
 // Disregard this, not relevant as of the moment
-app.use((c, next) => discordVerify(c, next)) 
+app.use((c, next) => discordVerify(c, next))
 //^
 
 app.post("/", async (c) => {
@@ -81,7 +119,7 @@ app.post("/", async (c) => {
 			//check command name
 			const { name } = data
 			switch ( name ) {
-				case ( 'test' ) :
+				case ( 'test' ) : {
 					//send message
 					console.log(data)
 					return c.json({
@@ -93,25 +131,26 @@ app.post("/", async (c) => {
 							allowed_mentions: { parse: [] }
 						},
 					})
-				
-				case ( 'top_anime' ) :
+				}
+
+				case ( 'top_anime' ) : {
 					//fetches top anime from Jikan (MAL_API)
-					const { options } = data
-					const { value } = options[0]
-					let x : any
+					const { value } = data.options[0]
 					const jikanreq = await fetch(`https://api.jikan.moe/v4/top/anime`)
-					x = await jikanreq.json()
+					const anime = await jikanreq.json() as any
+					const topAnime = JSON.stringify(anime.data[value-1].titles[0].title) //gets the default title of the #n top anime
 					return c.json({
 						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
 						data: {
 							tts: false,
-							content: JSON.stringify(x.data[value-1].titles[0].title), //gets the default title of the #n top anime
+							content: `The number ${value} top anime is ${topAnime}`,
 							embeds: [],
 							allowed_mentions: { parse: [] }
 						},
 					})
-
-				case ( 'button' ) :
+				}
+					
+				case ( 'button' ) : {
 					//makes a button that does nothing
 					return c.json({
 						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -134,9 +173,12 @@ app.post("/", async (c) => {
 							allowed_mentions: { parse: [] }
 						}
 					})
+				}
 
-				case ( 'create_task' ) :
+				case ( 'create_task' ) : {
 					//make button, does nothing
+					const { options } = data
+
 					return c.json({
 						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
 						data: {
@@ -158,6 +200,69 @@ app.post("/", async (c) => {
 							allowed_mentions: { parse: [] }
 						}
 					})
+				}
+
+				case ( 'find_workspaces' ) : {
+					//finds available workspaces
+					const { CLICKUP_TOKEN } = c.env
+					const req = await fetch(
+						'https://api.clickup.com/api/v2/team',
+						{
+							method : 'GET',
+							headers : {
+								Authorization : `${CLICKUP_TOKEN}`
+							}
+						}
+					)
+					const workspaces = await req.json() as any
+					console.log(workspaces)
+					const { teams } = workspaces
+					let msg = 'Here are the workspaces we found:\n'
+					for (let i = 0; i < teams.length; i++){
+						msg = msg.concat(`${teams[i].name} with ID number ${teams[i].id}\n`)
+					}
+					return c.json({
+						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+						data: {
+							tts: false,
+							content: msg,
+							embeds: [],
+							allowed_mentions: { parse: [] }
+						},
+					})
+				}
+
+				case ( 'find_spaces' ) : {
+					//finds available spaces
+					const query = new URLSearchParams({archived : 'false'}).toString()
+					const { CLICKUP_TOKEN } = c.env
+					const team_id = data.options[0].value
+					const req = await fetch(
+						`https://api.clickup.com/api/v2/team/${team_id}/space?${query}`,
+						{
+							method : 'GET',
+							headers : {
+								Authorization : `${CLICKUP_TOKEN}`
+							}
+						}
+					)
+					const spacelist = await req.json() as any
+					console.log(data)
+					const { spaces } = spacelist
+					let msg = 'Here are the spaces we found:\n'
+					for (let i = 0; i < spaces.length; i++){
+						msg = msg.concat(`${spaces[i].name} with ID number: ${spaces[i].id}\n`)
+					}
+					return c.json({
+						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+						data: {
+							tts: false,
+							content: msg,
+							embeds: [],
+							allowed_mentions: { parse: [] }
+						},
+					})
+				}
 			}
 		}
 	}
