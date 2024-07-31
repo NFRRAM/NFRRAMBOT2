@@ -210,7 +210,6 @@ app.post("/", async (c) => {
 					const workspaces = await req.json() as any
 					const workspace = findObjFromObjList(team_id,workspaces.teams)
 					const { members } = workspace
-					console.log(workspace)
 					let msg = `Here are the users we found in the workspace with ID ${team_id}:\n`
 					for (let i = 0; i < members.length; i++){
 						msg = msg.concat(`${members[i].user.username} with ID number: ${members[i].user.id}\n`)
@@ -351,9 +350,11 @@ app.post("/", async (c) => {
 					}
 
 					else { // folderless is false
+						console.log(data) // i need to find out whats happening to create_task and why its telling me cant read properties of undefined
 						const query = new URLSearchParams({archived : 'false'}).toString()
 						const { CLICKUP_TOKEN } = c.env
 						const folder_id = findObjValueFromObjList('folder_id',options)
+						console.log(folder_id) // same as previous comment
 						const req = await fetch(
 							`https://api.clickup.com/api/v2/folder/${folder_id}/list?${query}`,
 							{
@@ -382,11 +383,15 @@ app.post("/", async (c) => {
 				}
 
 				case ( 'create_task' ) : {
-					//make button, does nothing
+					//creates task
 					const { options } = data
 					const list_id = findObjValueFromObjList('list_id',options)
+					// console.log(list_id)
 					const task_name = findObjValueFromObjList('task_name',options)
+					// console.log(task_name)
+					// the line below actually errors if you don't pass a task_desc. todo: fix
 					const task_desc = findObjValueFromObjList('task_desc',options)
+					// console.log(task_desc)
 					const { CLICKUP_TOKEN } = c.env
 					/*
 					v from ClickUp Docs, need to look up wtf custom task ids are for and
@@ -398,6 +403,15 @@ app.post("/", async (c) => {
 					// 	custom_task_id : 'true',
 					// 	team_id : '123'
 					// }).toString()
+					const assignees = findObjValueFromObjList('assignees',options)
+					let assignee_list = assignees.split(',')
+					for (let i=0;i<assignee_list.length;i++){
+						assignee_list[0] = Number(assignee_list[0])
+					}
+					const due_date = findObjValueFromObjList('due_date',options)
+					const due_date_unix = parseInt((new Date(due_date).getTime() / 1000).toFixed(0)) // this actually converts to unix timestamp supposedly
+					const start_date = findObjValueFromObjList('start_date',options)
+					const start_date_unix = parseInt((new Date(start_date).getTime() / 1000).toFixed(0)) // this actually converts to unix timestamp supposedly
 					const req = await fetch(
 						//`https://api.clickup.com/api/v2/list/${list_id}/task?${query}`
 						`https://api.clickup.com/api/v2/list/${list_id}/task`,
@@ -407,33 +421,41 @@ app.post("/", async (c) => {
 								'Content-Type' : 'application/json',
 								Authorization : `${CLICKUP_TOKEN}`,
 							},
-							body : JSON.stringify({
+							body : JSON.stringify({ // check https://clickup.com/api/developer-portal/tasks/#tasks
 								name : `${task_name}`,
 								description : `${task_desc}`,
 								markdown_description : `${task_desc}`, // not sure what makes this different from description, might need to check that
-								assignees : [183], //idk this was in the sample
-								archived : false,
-								group_assignees : []
+								assignees : assignee_list, // there might be a better way to do this on discord side, but idk. read more docs
+								group_assignees : [], // i dont know what this is, ask JM
+								tags : ['tag name 1'],
+								status : 'TO DO',
+								priority : 3,
+								due_date : due_date_unix,
+								due_date_time : false,
+								time_estimate : 8640000, // idk wtf this does
+								start_date : start_date_unix,
+								start_date_time : false,
+								points : 3, // check https://clickup.com/api/clickupreference/operation/CreateTask/
+								notify_all : true,
+								parent : null,
+								links_to : null,
+								check_required_custom_fields: false, // do we need to change this idk
+								// custom_fields : [
+								// 	{
+								// 		id: ,
+								//		value : 'This is a string of text added to a Custom Field.'
+								// 	}
+								// ]
 							})
 						}
 					)
+					const response = await req.json()
+					console.log(response)
 					return c.json({
 						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
 						data: {
 							tts: false,
-							components: [
-								{
-									type: 1,
-									components: [
-										{
-											type: 2,
-											label: "testbuttonworks...",
-											style: 1,
-											custom_id: "click_one"
-										}
-									]
-								}
-							],
+							content: 'Task Created!',
 							embeds: [],
 							allowed_mentions: { parse: [] }
 						}

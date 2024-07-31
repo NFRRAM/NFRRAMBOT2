@@ -42,6 +42,24 @@ const CREATE_TASK = {
             required : true,
         },
         {
+            name : "assignees",
+            description : "assignee IDs, seperated by commas (if more than one) AND NO SPACES(?)",
+            type : 3,
+            required : true,
+        },
+        {
+            name : "due_date",
+            description : "YYYY.MM.DD",
+            type : 3,
+            required : true,
+        },
+        {
+            name : "start_date",
+            description : "YYYY.MM.DD",
+            type : 3,
+            required : true,
+        },
+        {
             name : "task_desc",
             description : "Description for the new task",
             type : 3,
