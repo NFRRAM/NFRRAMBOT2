@@ -436,6 +436,7 @@ app.post("/", async (c) => {
 								start_date : start_date_unix,
 								start_date_time : false,
 								points : 3, // check https://clickup.com/api/clickupreference/operation/CreateTask/
+								// we needed to enable a clickup app here specifically. might need to change?
 								notify_all : true,
 								parent : null,
 								links_to : null,
