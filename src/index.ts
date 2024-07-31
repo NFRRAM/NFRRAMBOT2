@@ -24,7 +24,8 @@ const app = new Hono<{ Bindings: Bindings }>();
  */
 const findObjValueFromObjList = (name: String, list: Array<any>) => {
 	return list.find((obj) => {
-		return obj.name === name;
+		// find is just better because obj.name is unique within the list
+		return obj.name === name; // === matches type as well
 	}).value;
 };
 
@@ -32,7 +33,7 @@ function findObjFromObjList(id: number, list: Array<any>) {
 	// this function returns the object
 	// with a matching ID key from a list containing the objects
 	const objlist = list.filter(function (objects: any) {
-		return objects.id == `${id}`;
+		return objects.id === id;
 	});
 	return objlist[0];
 }
