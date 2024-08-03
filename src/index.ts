@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { InteractionResponseType, InteractionType } from 'discord-interactions';
 import { COMMAND_LIST } from './commands'; // Modify commands here
 import { discordVerify } from './helpers'; // No need to look here
+import { parseBody } from 'hono/utils/body';
 
 type Bindings = {
 	DISCORD_APP_ID: string;
@@ -14,19 +15,58 @@ const DISCORD_BASE_URI = 'https://discord.com/api';
 
 // Consume the environment variables
 const app = new Hono<{ Bindings: Bindings }>();
-/**this function returns the value of the value key from the object
- *with a matching name key from a list containing the objects
- *note: applies non-required options if they exist,
- *otherwise, returns default values
- *default false for boolean, 0 for number
- *
- *
+
+interface DiscordOption {
+	name: string;
+	value: string;
+}
+
+interface DiscordBotResponse {
+	type: InteractionResponseType;
+	data: {
+		tts: boolean;
+		content: string;
+		embeds: Array<any>; // fix this
+		allowed_mentions: {
+			parse: Array<any>; // fix this
+		};
+	};
+}
+
+/**
+ * This function returns the value of the value key from the object with a
+ * matching name key from a list containing the objects
+ * NOTE : Will return a null value if the option is not required,
+ * this should be handled when setting the payload to be sent
+ * @param {String} name Value of the 'name' key the option has
+ * @param {Array<Object>} list List of options
+ * @returns Value of key 'value' of the option with the value of name parameter
  */
-const findObjValueFromObjList = (name: String, list: Array<any>) => {
-	return list.find((obj) => {
+const findObjValueFromObjList = (name: string, list: DiscordOption[]): string | number | boolean => {
+	// if any is changed to Object it errors because obj may be undefined idk how or why
+	const objValue = list.find((obj) => {
 		// find is just better because obj.name is unique within the list
 		return obj.name === name; // === matches type as well
-	}).value;
+	})!.value;
+	return objValue;
+};
+
+/**
+ * This function will be used to get the discord bot to send a message back to the channel
+ * @param {String} msg Message to be sent by the discord bot
+ * @returns Object containing the payload that Discord is expecting (custom type DiscordBotResponse)
+ */
+const sendMessage = (msg: string): DiscordBotResponse => {
+	// fix this type declaration
+	return {
+		type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+		data: {
+			tts: false,
+			content: msg,
+			embeds: [],
+			allowed_mentions: { parse: [] },
+		},
+	};
 };
 
 function findObjFromObjList(id: number, list: Array<any>) {
@@ -64,19 +104,13 @@ app.get('/setup', async (c) => {
 });
 
 // This is to update the commands instead if we don't need to send a POST request
+// note: /update instead of /setup
 app.get('/update', async (c) => {
-	// Grab the secrets from the environment
 	const { DISCORD_APP_ID, DISCORD_TOKEN } = c.env;
-
-	// String formatting with variable values. NOTE: tilde instead of quote marks
 	const url = `${DISCORD_BASE_URI}/v10/applications/${DISCORD_APP_ID}/commands`;
-	//edited URL to change scope to guild commands to see if it updates slash commands faster than application commands -ram
-	//old URL (check docs) : `${DISCORD_BASE_URI}/v10/applications/${DISCORD_APP_ID}/commands`
 
 	const req = await fetch(url, {
 		method: 'PUT',
-		/* We have to serialize the COMMANDS JS Object into JSON (JS -> JSON) using JSON.stringify() because it is going outward from our system. 
-		We need to serialize into JSON whenever it is going out of our application, and deserialize (parse) into JSON when using it inside the application */
 		body: JSON.stringify(COMMAND_LIST),
 		headers: {
 			Authorization: `Bot ${DISCORD_TOKEN}`,
@@ -91,8 +125,7 @@ app.get('/update', async (c) => {
 	}
 
 	const body = await req.text();
-	return c.text(JSON.stringify(body)); // c.json() handles serialization into JSON for us
-	//^ changed to c.text just to show how it works - ram
+	return c.text(JSON.stringify(body));
 });
 
 app.get('/', (c) => c.json({ msg: 'nfrrambot Interaction API Working' }));
@@ -111,7 +144,7 @@ app.post('/', async (c) => {
 
 	// Deserialize the body from JSON into a JS Object
 	const body = await req.json();
-	// console.log(body)
+	console.log(body);
 
 	// Take the type field from the body
 	const { type, data } = body;
@@ -138,16 +171,9 @@ app.post('/', async (c) => {
 			switch (name) {
 				case 'test': {
 					//send message
-					console.log(data);
-					return c.json({
-						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-						data: {
-							tts: false,
-							content: 'Test works!',
-							embeds: [],
-							allowed_mentions: { parse: [] },
-						},
-					});
+					console.log(typeof c);
+					const msg = 'Test Successful!';
+					return c.json(sendMessage(msg));
 				}
 
 				case 'top_anime': {
@@ -156,16 +182,10 @@ app.post('/', async (c) => {
 					const n = findObjValueFromObjList('n', options) ?? 1;
 					const jikanreq = await fetch(`https://api.jikan.moe/v4/top/anime`);
 					const anime = (await jikanreq.json()) as any;
-					const topAnime = JSON.stringify(anime.data[n - 1].titles[0].title); //gets the default title of the #n top anime
-					return c.json({
-						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-						data: {
-							tts: false,
-							content: `The number ${n} top anime is ${topAnime}`,
-							embeds: [],
-							allowed_mentions: { parse: [] },
-						},
-					});
+					const place = (n as number) - 1; //fix this n as number stuff, apparently bad practice, ideally maybe
+					const topAnime = JSON.stringify(anime.data[place].titles[0].title); //gets the default title of the #n top anime
+					const msg = `The number ${n} top anime is ${topAnime}`;
+					return c.json(sendMessage(msg));
 				}
 
 				case 'button': {
@@ -205,21 +225,13 @@ app.post('/', async (c) => {
 						},
 					});
 					const workspaces = (await req.json()) as any;
-					const workspace = findObjFromObjList(team_id, workspaces.teams);
+					const workspace = findObjFromObjList(team_id as number, workspaces.teams); //fix this type declaration
 					const { members } = workspace;
 					let msg = `Here are the users we found in the workspace with ID ${team_id}:\n`;
 					for (let i = 0; i < members.length; i++) {
 						msg = msg.concat(`${members[i].user.username} with ID number: ${members[i].user.id}\n`);
 					}
-					return c.json({
-						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-						data: {
-							tts: false,
-							content: msg,
-							embeds: [],
-							allowed_mentions: { parse: [] },
-						},
-					});
+					return c.json(sendMessage(msg));
 				}
 
 				case 'find_workspaces': {
@@ -237,15 +249,7 @@ app.post('/', async (c) => {
 					for (let i = 0; i < teams.length; i++) {
 						msg = msg.concat(`${teams[i].name} with ID number ${teams[i].id}\n`);
 					}
-					return c.json({
-						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-						data: {
-							tts: false,
-							content: msg,
-							embeds: [],
-							allowed_mentions: { parse: [] },
-						},
-					});
+					return c.json(sendMessage(msg));
 				}
 
 				case 'find_spaces': {
@@ -260,21 +264,13 @@ app.post('/', async (c) => {
 							Authorization: `${CLICKUP_TOKEN}`,
 						},
 					});
-					const spacelist = (await req.json()) as any;
+					const spacelist = (await req.json()) as any; // fix this
 					const { spaces } = spacelist;
 					let msg = `Here are the spaces we found inside workspace ID ${team_id}:\n`;
 					for (let i = 0; i < spaces.length; i++) {
 						msg = msg.concat(`${spaces[i].name} with ID number: ${spaces[i].id}\n`);
 					}
-					return c.json({
-						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-						data: {
-							tts: false,
-							content: msg,
-							embeds: [],
-							allowed_mentions: { parse: [] },
-						},
-					});
+					return c.json(sendMessage(msg));
 				}
 
 				case 'find_folders': {
@@ -289,21 +285,13 @@ app.post('/', async (c) => {
 							Authorization: `${CLICKUP_TOKEN}`,
 						},
 					});
-					const folderlist = (await req.json()) as any;
+					const folderlist = (await req.json()) as any; // fix this
 					const { folders } = folderlist;
 					let msg = `Here are the folders we found inside space ID ${space_id}:\n`;
 					for (let i = 0; i < folders.length; i++) {
 						msg = msg.concat(`${folders[i].name} with ID number: ${folders[i].id}\n`);
 					}
-					return c.json({
-						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-						data: {
-							tts: false,
-							content: msg,
-							embeds: [],
-							allowed_mentions: { parse: [] },
-						},
-					});
+					return c.json(sendMessage(msg));
 				}
 
 				case 'find_lists': {
@@ -321,26 +309,20 @@ app.post('/', async (c) => {
 								Authorization: `${CLICKUP_TOKEN}`,
 							},
 						});
-						const listlist = (await req.json()) as any;
+						const listlist = (await req.json()) as any; // fix this
 						const { lists } = listlist;
 						let msg = `Here are the folderless lists we found inside space ID ${space_id}:\n`;
 						for (let i = 0; i < lists.length; i++) {
 							msg = msg.concat(`${lists[i].name} with ID number: ${lists[i].id}\n`);
 						}
-						return c.json({
-							type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-							data: {
-								tts: false,
-								content: msg,
-								embeds: [],
-								allowed_mentions: { parse: [] },
-							},
-						});
+						return c.json(sendMessage(msg));
 					} else {
 						// folderless is false
 						const query = new URLSearchParams({ archived: 'false' }).toString();
 						const { CLICKUP_TOKEN } = c.env;
 						const folder_id = findObjValueFromObjList('folder_id', options) ?? 0;
+						if (!folder_id) {
+						}
 						const req = await fetch(`https://api.clickup.com/api/v2/folder/${folder_id}/list?${query}`, {
 							method: 'GET',
 							headers: {
@@ -353,27 +335,19 @@ app.post('/', async (c) => {
 						for (let i = 0; i < lists.length; i++) {
 							msg = msg.concat(`${lists[i].name} with ID number: ${lists[i].id}\n`);
 						}
-						return c.json({
-							type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-							data: {
-								tts: false,
-								content: msg,
-								embeds: [],
-								allowed_mentions: { parse: [] },
-							},
-						});
+						return c.json(sendMessage(msg));
 					}
 				}
 
 				case 'create_task': {
 					//creates task
 					const { options } = data;
-					const list_id = findObjValueFromObjList('list_id', options) ?? 0;
+					const list_id = findObjValueFromObjList('list_id', options);
 					console.log(list_id);
-					const task_name = findObjValueFromObjList('task_name', options) ?? '';
+					const task_name = findObjValueFromObjList('task_name', options);
 					// console.log(task_name)
 					// Try to apply non-required options
-					const task_desc = findObjValueFromObjList('task_desc', options) ?? '';
+					const task_desc = findObjValueFromObjList('task_desc', options);
 					// console.log(task_desc)
 					const { CLICKUP_TOKEN } = c.env;
 					/*
@@ -386,23 +360,23 @@ app.post('/', async (c) => {
 					// 	custom_task_id : 'true',
 					// 	team_id : '123'
 					// }).toString()
-					const assignees = findObjValueFromObjList('assignees', options) ?? '';
-					let assignee_list = assignees.split(',');
+					const assignees = findObjValueFromObjList('assignees', options);
+					let assignee_list: Array<string | number> = (assignees as string).split(',');
 					for (let i = 0; i < assignee_list.length; i++) {
 						assignee_list[0] = Number(assignee_list[0]);
 					}
 					const due_date = findObjValueFromObjList('due_date', options);
-					const due_date_unix = parseInt((new Date(due_date).getTime() / 1000).toFixed(0)); // this actually converts to unix timestamp supposedly
-					const start_date = findObjValueFromObjList('start_date', options) ?? '';
-					const start_date_unix = parseInt((new Date(start_date).getTime() / 1000).toFixed(0)); // this actually converts to unix timestamp supposedly
-					const tag_names = findObjValueFromObjList('tag_names', options) ?? '';
-					let tag_list = tag_names.split(',');
+					const due_date_unix = parseInt((new Date(due_date as string).getTime() / 1000).toFixed(0)); // this actually converts to unix timestamp supposedly
+					const start_date = findObjValueFromObjList('start_date', options);
+					const start_date_unix = parseInt((new Date(start_date as string).getTime() / 1000).toFixed(0)); // this actually converts to unix timestamp supposedly
+					const tag_names = findObjValueFromObjList('tag_names', options);
+					let tag_list: Array<string | number> = (tag_names as string).split(',');
 					for (let i = 0; i < tag_list.length; i++) {
 						tag_list[0] = Number(tag_list[0]);
 					}
-					const status_name = findObjValueFromObjList('status_name', options) ?? '';
-					const priority = findObjValueFromObjList('priority', options) ?? 1;
-					const sprint_points = findObjValueFromObjList('sprint_points', options) ?? 1;
+					const status_name = findObjValueFromObjList('status_name', options);
+					const priority = findObjValueFromObjList('priority', options);
+					const sprint_points = findObjValueFromObjList('sprint_points', options);
 
 					const req = await fetch(
 						//`https://api.clickup.com/api/v2/list/${list_id}/task?${query}`
@@ -415,21 +389,21 @@ app.post('/', async (c) => {
 							},
 							body: JSON.stringify({
 								// check https://clickup.com/api/developer-portal/tasks/#tasks
-								name: `${task_name}`,
-								description: `${task_desc}`,
-								markdown_description: `${task_desc}`, // not sure what makes this different from description, might need to check that
+								name: task_name ?? '',
+								description: task_desc ?? '',
+								markdown_description: task_desc ?? '', // not sure what makes this different from description, might need to check that
 								// it's for using markdown language for bold and italics and such - ram
-								assignees: assignee_list, // there might be a better way to do this on discord side, but idk. read more docs
+								assignees: assignee_list ?? [], // there might be a better way to do this on discord side, but idk. read more docs
 								group_assignees: [], // i dont know what this is, ask JM
-								tags: tag_list,
-								status: `${status_name}`,
-								priority: priority,
-								due_date: due_date_unix,
+								tags: tag_list ?? [],
+								status: status_name ?? '',
+								priority: priority ?? 4,
+								due_date: due_date_unix ?? 0,
 								due_date_time: false,
 								time_estimate: 8640000, // idk wtf this does
-								start_date: start_date_unix,
+								start_date: start_date_unix ?? 0,
 								start_date_time: false,
-								points: sprint_points, // check https://clickup.com/api/clickupreference/operation/CreateTask/
+								points: sprint_points ?? 1, // check https://clickup.com/api/clickupreference/operation/CreateTask/
 								// we needed to enable a clickup app here specifically. might need to change?
 								notify_all: true,
 								parent: null,
@@ -446,15 +420,7 @@ app.post('/', async (c) => {
 					);
 					const response = await req.json();
 					console.log(response);
-					return c.json({
-						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-						data: {
-							tts: false,
-							content: 'Task Created!',
-							embeds: [],
-							allowed_mentions: { parse: [] },
-						},
-					});
+					return c.json(sendMessage('Task Created! Check ClickUp.'));
 				}
 			}
 		}
