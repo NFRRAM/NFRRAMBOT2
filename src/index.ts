@@ -2,7 +2,9 @@ import { Hono } from 'hono';
 import { InteractionResponseType, InteractionType } from 'discord-interactions';
 import { COMMAND_LIST } from './commands'; // Modify commands here
 import { discordVerify } from './helpers'; // No need to look here
-import { parseBody } from 'hono/utils/body';
+// import { parseBody } from 'hono/utils/body'; // apparently not used
+import * as Interfaces from './interfaces';
+import * as functions from './functions';
 
 type Bindings = {
 	DISCORD_APP_ID: string;
@@ -15,68 +17,6 @@ const DISCORD_BASE_URI = 'https://discord.com/api';
 
 // Consume the environment variables
 const app = new Hono<{ Bindings: Bindings }>();
-
-interface DiscordOption {
-	name: string;
-	value: string;
-}
-
-interface DiscordBotResponse {
-	type: InteractionResponseType;
-	data: {
-		tts: boolean;
-		content: string;
-		embeds: Array<any>; // fix this
-		allowed_mentions: {
-			parse: Array<any>; // fix this
-		};
-	};
-}
-
-/**
- * This function returns the value of the value key from the object with a
- * matching name key from a list containing the objects
- * NOTE : Will return a null value if the option is not required,
- * this should be handled when setting the payload to be sent
- * @param {String} name Value of the 'name' key the option has
- * @param {Array<Object>} list List of options
- * @returns Value of key 'value' of the option with the value of name parameter
- */
-const findObjValueFromObjList = (name: string, list: DiscordOption[]): string | number | boolean => {
-	// if any is changed to Object it errors because obj may be undefined idk how or why
-	const objValue = list.find((obj) => {
-		// find is just better because obj.name is unique within the list
-		return obj.name === name; // === matches type as well
-	})!.value;
-	return objValue;
-};
-
-/**
- * This function will be used to get the discord bot to send a message back to the channel
- * @param {String} msg Message to be sent by the discord bot
- * @returns Object containing the payload that Discord is expecting (custom type DiscordBotResponse)
- */
-const sendMessage = (msg: string): DiscordBotResponse => {
-	// fix this type declaration
-	return {
-		type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-		data: {
-			tts: false,
-			content: msg,
-			embeds: [],
-			allowed_mentions: { parse: [] },
-		},
-	};
-};
-
-function findObjFromObjList(id: number, list: Array<any>) {
-	// this function returns the object
-	// with a matching ID key from a list containing the objects
-	const objlist = list.filter(function (objects: any) {
-		return objects.id === id;
-	});
-	return objlist[0];
-}
 
 app.get('/setup', async (c) => {
 	// Grab the secrets from the environment
@@ -173,19 +113,19 @@ app.post('/', async (c) => {
 					//send message
 					console.log(typeof c);
 					const msg = 'Test Successful!';
-					return c.json(sendMessage(msg));
+					return c.json(functions.sendMessage(msg));
 				}
 
 				case 'top_anime': {
 					//fetches top anime from Jikan (MAL_API)
 					const { options } = data;
-					const n = findObjValueFromObjList('n', options) ?? 1;
+					const n = functions.findObjValueFromObjList('n', options) ?? 1;
 					const jikanreq = await fetch(`https://api.jikan.moe/v4/top/anime`);
-					const anime = (await jikanreq.json()) as any;
+					const anime = (await jikanreq.json()) as Interfaces.JikanTopAnimePayload; // fix this
 					const place = (n as number) - 1; //fix this n as number stuff, apparently bad practice, ideally maybe
 					const topAnime = JSON.stringify(anime.data[place].titles[0].title); //gets the default title of the #n top anime
 					const msg = `The number ${n} top anime is ${topAnime}`;
-					return c.json(sendMessage(msg));
+					return c.json(functions.sendMessage(msg));
 				}
 
 				case 'button': {
@@ -216,7 +156,7 @@ app.post('/', async (c) => {
 				case 'find_users': {
 					//finds available workspaces
 					const { options } = data;
-					const team_id = findObjValueFromObjList('team_id', options) ?? 0;
+					const team_id = functions.findObjValueFromObjList('team_id', options) ?? 0;
 					const { CLICKUP_TOKEN } = c.env;
 					const req = await fetch('https://api.clickup.com/api/v2/team', {
 						method: 'GET',
@@ -224,14 +164,14 @@ app.post('/', async (c) => {
 							Authorization: `${CLICKUP_TOKEN}`,
 						},
 					});
-					const workspaces = (await req.json()) as any;
-					const workspace = findObjFromObjList(team_id as number, workspaces.teams); //fix this type declaration
+					const workspaces = (await req.json()) as any; // fix this
+					const workspace = functions.findObjFromObjList(team_id as number, workspaces.teams);
 					const { members } = workspace;
 					let msg = `Here are the users we found in the workspace with ID ${team_id}:\n`;
 					for (let i = 0; i < members.length; i++) {
 						msg = msg.concat(`${members[i].user.username} with ID number: ${members[i].user.id}\n`);
 					}
-					return c.json(sendMessage(msg));
+					return c.json(functions.sendMessage(msg));
 				}
 
 				case 'find_workspaces': {
@@ -243,13 +183,13 @@ app.post('/', async (c) => {
 							Authorization: `${CLICKUP_TOKEN}`,
 						},
 					});
-					const workspaces = (await req.json()) as any;
+					const workspaces = (await req.json()) as Interfaces.Workspace;
 					const { teams } = workspaces;
 					let msg = 'Here are the workspaces we found using your ClickUp key:\n';
 					for (let i = 0; i < teams.length; i++) {
 						msg = msg.concat(`${teams[i].name} with ID number ${teams[i].id}\n`);
 					}
-					return c.json(sendMessage(msg));
+					return c.json(functions.sendMessage(msg));
 				}
 
 				case 'find_spaces': {
@@ -257,7 +197,7 @@ app.post('/', async (c) => {
 					const { options } = data;
 					const query = new URLSearchParams({ archived: 'false' }).toString();
 					const { CLICKUP_TOKEN } = c.env;
-					const team_id = findObjValueFromObjList('team_id', options) ?? 0;
+					const team_id = functions.findObjValueFromObjList('team_id', options) ?? 0;
 					const req = await fetch(`https://api.clickup.com/api/v2/team/${team_id}/space?${query}`, {
 						method: 'GET',
 						headers: {
@@ -270,7 +210,7 @@ app.post('/', async (c) => {
 					for (let i = 0; i < spaces.length; i++) {
 						msg = msg.concat(`${spaces[i].name} with ID number: ${spaces[i].id}\n`);
 					}
-					return c.json(sendMessage(msg));
+					return c.json(functions.sendMessage(msg));
 				}
 
 				case 'find_folders': {
@@ -278,7 +218,7 @@ app.post('/', async (c) => {
 					const { options } = data;
 					const query = new URLSearchParams({ archived: 'false' }).toString();
 					const { CLICKUP_TOKEN } = c.env;
-					const space_id = findObjValueFromObjList('space_id', options) ?? 0;
+					const space_id = functions.findObjValueFromObjList('space_id', options) ?? 0;
 					const req = await fetch(`https://api.clickup.com/api/v2/space/${space_id}/folder?${query}`, {
 						method: 'GET',
 						headers: {
@@ -291,18 +231,18 @@ app.post('/', async (c) => {
 					for (let i = 0; i < folders.length; i++) {
 						msg = msg.concat(`${folders[i].name} with ID number: ${folders[i].id}\n`);
 					}
-					return c.json(sendMessage(msg));
+					return c.json(functions.sendMessage(msg));
 				}
 
 				case 'find_lists': {
 					//finds available lists, either using a folder or a space
 					const { options } = data;
-					const folderless = findObjValueFromObjList('folderless', options) ?? false;
+					const folderless = functions.findObjValueFromObjList('folderless', options) ?? false;
 					if (folderless) {
 						// folderless is true
 						const query = new URLSearchParams({ archived: 'false' }).toString();
 						const { CLICKUP_TOKEN } = c.env;
-						const space_id = findObjValueFromObjList('space_id', options) ?? 0;
+						const space_id = functions.findObjValueFromObjList('space_id', options) ?? 0;
 						const req = await fetch(`https://api.clickup.com/api/v2/space/${space_id}/list?${query}`, {
 							method: 'GET',
 							headers: {
@@ -315,12 +255,12 @@ app.post('/', async (c) => {
 						for (let i = 0; i < lists.length; i++) {
 							msg = msg.concat(`${lists[i].name} with ID number: ${lists[i].id}\n`);
 						}
-						return c.json(sendMessage(msg));
+						return c.json(functions.sendMessage(msg));
 					} else {
 						// folderless is false
 						const query = new URLSearchParams({ archived: 'false' }).toString();
 						const { CLICKUP_TOKEN } = c.env;
-						const folder_id = findObjValueFromObjList('folder_id', options) ?? 0;
+						const folder_id = functions.findObjValueFromObjList('folder_id', options) ?? 0;
 						if (!folder_id) {
 						}
 						const req = await fetch(`https://api.clickup.com/api/v2/folder/${folder_id}/list?${query}`, {
@@ -335,19 +275,18 @@ app.post('/', async (c) => {
 						for (let i = 0; i < lists.length; i++) {
 							msg = msg.concat(`${lists[i].name} with ID number: ${lists[i].id}\n`);
 						}
-						return c.json(sendMessage(msg));
+						return c.json(functions.sendMessage(msg));
 					}
 				}
 
 				case 'create_task': {
 					//creates task
 					const { options } = data;
-					const list_id = findObjValueFromObjList('list_id', options);
+					const list_id = functions.findObjValueFromObjList('list_id', options);
 					console.log(list_id);
-					const task_name = findObjValueFromObjList('task_name', options);
+					const task_name = functions.findObjValueFromObjList('task_name', options);
 					// console.log(task_name)
-					// Try to apply non-required options
-					const task_desc = findObjValueFromObjList('task_desc', options);
+					const task_desc = functions.findObjValueFromObjList('task_desc', options);
 					// console.log(task_desc)
 					const { CLICKUP_TOKEN } = c.env;
 					/*
@@ -360,23 +299,23 @@ app.post('/', async (c) => {
 					// 	custom_task_id : 'true',
 					// 	team_id : '123'
 					// }).toString()
-					const assignees = findObjValueFromObjList('assignees', options);
+					const assignees = functions.findObjValueFromObjList('assignees', options);
 					let assignee_list: Array<string | number> = (assignees as string).split(',');
 					for (let i = 0; i < assignee_list.length; i++) {
 						assignee_list[0] = Number(assignee_list[0]);
 					}
-					const due_date = findObjValueFromObjList('due_date', options);
+					const due_date = functions.findObjValueFromObjList('due_date', options);
 					const due_date_unix = parseInt((new Date(due_date as string).getTime() / 1000).toFixed(0)); // this actually converts to unix timestamp supposedly
-					const start_date = findObjValueFromObjList('start_date', options);
+					const start_date = functions.findObjValueFromObjList('start_date', options);
 					const start_date_unix = parseInt((new Date(start_date as string).getTime() / 1000).toFixed(0)); // this actually converts to unix timestamp supposedly
-					const tag_names = findObjValueFromObjList('tag_names', options);
+					const tag_names = functions.findObjValueFromObjList('tag_names', options);
 					let tag_list: Array<string | number> = (tag_names as string).split(',');
 					for (let i = 0; i < tag_list.length; i++) {
 						tag_list[0] = Number(tag_list[0]);
 					}
-					const status_name = findObjValueFromObjList('status_name', options);
-					const priority = findObjValueFromObjList('priority', options);
-					const sprint_points = findObjValueFromObjList('sprint_points', options);
+					const status_name = functions.findObjValueFromObjList('status_name', options);
+					const priority = functions.findObjValueFromObjList('priority', options);
+					const sprint_points = functions.findObjValueFromObjList('sprint_points', options);
 
 					const req = await fetch(
 						//`https://api.clickup.com/api/v2/list/${list_id}/task?${query}`
@@ -420,7 +359,7 @@ app.post('/', async (c) => {
 					);
 					const response = await req.json();
 					console.log(response);
-					return c.json(sendMessage('Task Created! Check ClickUp.'));
+					return c.json(functions.sendMessage('Task Created! Check ClickUp.'));
 				}
 			}
 		}
