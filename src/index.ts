@@ -84,7 +84,7 @@ app.post('/', async (c) => {
 
 	// Deserialize the body from JSON into a JS Object
 	const body = await req.json();
-	console.log(body);
+	// console.log(body);
 
 	// Take the type field from the body
 	const { type, data } = body;
@@ -122,9 +122,26 @@ app.post('/', async (c) => {
 					const n = functions.findObjValueFromObjList('n', options) ?? 1;
 					const jikanreq = await fetch(`https://api.jikan.moe/v4/top/anime`);
 					const anime = (await jikanreq.json()) as Interfaces.JikanTopAnimePayload; // fix this
-					const place = (n as number) - 1; //fix this n as number stuff, apparently bad practice, ideally maybe
-					const topAnime = JSON.stringify(anime.data[place].titles[0].title); //gets the default title of the #n top anime
+					const place = (n as number) - 1; //fix this n as number stuff, apparently bad practice, ideally maybe 3 different functions acc to jai
+					const topAnime = JSON.stringify(anime.data[place].title_english); //gets the english title of the #n top anime
 					const msg = `The number ${n} top anime is ${topAnime}`;
+					return c.json(functions.sendMessage(msg));
+				}
+
+				case 'search_anime': {
+					//searches for the closest anime from Jikan (MAL_API)
+					const { options } = data;
+					const name = functions.findObjValueFromObjList('anime', options) ?? '';
+					const query = new URLSearchParams({ q: name as string }); //fix this name as string stuff
+					const jikanreq = await fetch(`https://api.jikan.moe/v4/anime?${query}`);
+					// const jikanreq = await fetch(`https://api.jikan.moe/v4/anime`);
+					const anime = (await jikanreq.json()) as Interfaces.JikanTopAnimePayload; // might need to change this, check
+					const closest_anime = JSON.stringify(anime.data[0].title_english); //gets the english title of the closest anime
+					const score = JSON.stringify(anime.data[0].score); //gets the score of the closest anime
+					let synopsis = anime.data[0].synopsis; //gets the synopsis of the closest anime
+					// synopsis = synopsis.replace(\\\n/g, '\n');
+					console.log(synopsis);
+					const msg = `The closest anime we could find is ${closest_anime}. \n\nIt has a score of ${score} on MyAnimeList.\n\nSynopsis: ${synopsis}`;
 					return c.json(functions.sendMessage(msg));
 				}
 
@@ -164,7 +181,7 @@ app.post('/', async (c) => {
 							Authorization: `${CLICKUP_TOKEN}`,
 						},
 					});
-					const workspaces = (await req.json()) as any; // fix this
+					const workspaces = (await req.json()) as Interfaces.Workspace;
 					const workspace = functions.findObjFromObjList(team_id as number, workspaces.teams);
 					const { members } = workspace;
 					let msg = `Here are the users we found in the workspace with ID ${team_id}:\n`;
@@ -204,7 +221,7 @@ app.post('/', async (c) => {
 							Authorization: `${CLICKUP_TOKEN}`,
 						},
 					});
-					const spacelist = (await req.json()) as any; // fix this
+					const spacelist = (await req.json()) as Interfaces.Space; // fix this
 					const { spaces } = spacelist;
 					let msg = `Here are the spaces we found inside workspace ID ${team_id}:\n`;
 					for (let i = 0; i < spaces.length; i++) {
@@ -225,7 +242,7 @@ app.post('/', async (c) => {
 							Authorization: `${CLICKUP_TOKEN}`,
 						},
 					});
-					const folderlist = (await req.json()) as any; // fix this
+					const folderlist = (await req.json()) as Interfaces.Folder; // fix this
 					const { folders } = folderlist;
 					let msg = `Here are the folders we found inside space ID ${space_id}:\n`;
 					for (let i = 0; i < folders.length; i++) {
@@ -241,6 +258,7 @@ app.post('/', async (c) => {
 					if (folderless) {
 						// folderless is true
 						const query = new URLSearchParams({ archived: 'false' }).toString();
+						// This is from ClickUp Example ^
 						const { CLICKUP_TOKEN } = c.env;
 						const space_id = functions.findObjValueFromObjList('space_id', options) ?? 0;
 						const req = await fetch(`https://api.clickup.com/api/v2/space/${space_id}/list?${query}`, {

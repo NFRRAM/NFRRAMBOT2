@@ -25,6 +25,19 @@ const TOP_ANIME = {
 	],
 };
 
+const SEARCH_ANIME = {
+	name: 'search_anime',
+	description: 'Fetches the closest-named anime from Jikan (MAL API)',
+	options: [
+		{
+			name: 'anime',
+			description: 'The name of the anime you want to search for',
+			type: 3,
+			required: true,
+		},
+	],
+};
+
 const CREATE_TASK = {
 	name: 'create_task',
 	description: 'Creates a task for a specific list in ClickUp',
@@ -201,4 +214,15 @@ const TEST = {
 	description: 'sends a message back from discord bot TESTING TESTING',
 };
 
-export const COMMAND_LIST = [TEST, BUTTON, CREATE_TASK, TOP_ANIME, FIND_WORKSPACES, FIND_SPACES, FIND_FOLDERS, FIND_LISTS, FIND_USERS];
+export const COMMAND_LIST = [
+	TEST,
+	BUTTON,
+	CREATE_TASK,
+	SEARCH_ANIME,
+	TOP_ANIME,
+	FIND_WORKSPACES,
+	FIND_SPACES,
+	FIND_FOLDERS,
+	FIND_LISTS,
+	FIND_USERS,
+];
