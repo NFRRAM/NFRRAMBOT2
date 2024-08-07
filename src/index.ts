@@ -5,6 +5,7 @@ import { discordVerify } from './helpers'; // No need to look here
 // import { parseBody } from 'hono/utils/body'; // apparently not used
 import * as Interfaces from './interfaces';
 import * as functions from './functions';
+import { renderToString } from 'hono/jsx/dom/server';
 
 type Bindings = {
 	DISCORD_APP_ID: string;
@@ -17,6 +18,11 @@ const DISCORD_BASE_URI = 'https://discord.com/api';
 
 // Consume the environment variables
 const app = new Hono<{ Bindings: Bindings }>();
+
+let anime_storage: number = 0;
+//we'll use this to store data for any search_anime lookups? maybe?
+let INTERACTION_TOKEN: string = '';
+// might need to save it pala? i dont fuckin know
 
 app.get('/setup', async (c) => {
 	// Grab the secrets from the environment
@@ -77,6 +83,7 @@ app.use((c, next) => discordVerify(c, next));
 //^
 
 app.post('/', async (c) => {
+	const { DISCORD_APP_ID, DISCORD_TOKEN } = c.env;
 	// console.log(c);
 
 	// Get the Request object from the Context object (c.req)
@@ -105,6 +112,40 @@ app.post('/', async (c) => {
 				type: InteractionResponseType.PONG,
 			});
 		}
+		case InteractionType.MESSAGE_COMPONENT: {
+			const url = `${DISCORD_BASE_URI}/v10/webhooks/${DISCORD_APP_ID}/${INTERACTION_TOKEN}/messages/@original`;
+			// console.log(INTERACTION_TOKEN);
+			const { custom_id } = data;
+			switch (custom_id) {
+				case 'search_anime_yes': {
+					// this part tries to use followup messages. doesnt work rn
+					// const followup = await fetch(url, {
+					// 	// this edits initial response
+					// 	method: 'PATCH',
+					// 	/* We have to serialize the COMMANDS JS Object into JSON (JS -> JSON) using JSON.stringify() because it is going outward from our system.
+					// 			We need to serialize into JSON whenever it is going out of our application, and deserialize (parse) into JSON when using it inside the application */
+					// 	body: JSON.stringify(functions.sendMessage(`testing`)),
+					// 	headers: {
+					// 		Authorization: `Bot ${DISCORD_TOKEN}`,
+					// 		'Content-type': 'application/json',
+					// 	},
+					// });
+					// const followup_body = await followup.text();
+					// console.log(JSON.stringify(followup_body));
+					// return c.json(followup_body);
+
+					// This works, but idt it's a followup message technically
+					// const query = new URLSearchParams({ id: `${anime_storage}` });
+					const jikanreq = await fetch(`https://api.jikan.moe/v4/anime/${anime_storage}`);
+					const anime = (await jikanreq.json()) as Interfaces.JikanSingleAnimePayload; //note this is a different interface
+					const closest_anime = JSON.stringify(anime.data.title_english); //gets the english title of the anime
+					const score = JSON.stringify(anime.data.score); //gets the score of the anime
+					let synopsis = anime.data.synopsis; //gets the synopsis of the anime
+					const msg = `English Title: ${closest_anime}. \n\nIt has a score of ${score} on MyAnimeList.\n\nSynopsis: ${synopsis}`;
+					return c.json(functions.sendMessage(msg));
+				}
+			}
+		}
 		case InteractionType.APPLICATION_COMMAND: {
 			//check command name
 			const { name } = data;
@@ -129,20 +170,53 @@ app.post('/', async (c) => {
 				}
 
 				case 'search_anime': {
-					//searches for the closest anime from Jikan (MAL_API)
+					//testing, this tries to use followup messages. using the other identical case works but assumes the first result is correct.
 					const { options } = data;
 					const name = functions.findObjValueFromObjList('anime', options) ?? '';
 					const query = new URLSearchParams({ q: name as string }); //fix this name as string stuff
 					const jikanreq = await fetch(`https://api.jikan.moe/v4/anime?${query}`);
-					// const jikanreq = await fetch(`https://api.jikan.moe/v4/anime`);
 					const anime = (await jikanreq.json()) as Interfaces.JikanTopAnimePayload; // might need to change this, check
 					const closest_anime = JSON.stringify(anime.data[0].title_english); //gets the english title of the closest anime
 					const score = JSON.stringify(anime.data[0].score); //gets the score of the closest anime
 					let synopsis = anime.data[0].synopsis; //gets the synopsis of the closest anime
-					// synopsis = synopsis.replace(\\\n/g, '\n');
-					console.log(synopsis);
-					const msg = `The closest anime we could find is ${closest_anime}. \n\nIt has a score of ${score} on MyAnimeList.\n\nSynopsis: ${synopsis}`;
-					return c.json(functions.sendMessage(msg));
+					// console.log(synopsis);
+					anime_storage = anime.data[0].mal_id;
+					INTERACTION_TOKEN = body.token;
+					const msg = `Did you mean ${closest_anime} with a score of ${score}?`;
+					return c.json({
+						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+						data: {
+							tts: false,
+							content: msg,
+							components: [
+								{
+									type: 1,
+									components: [
+										{
+											type: 2,
+											label: 'Yes',
+											style: 3,
+											custom_id: 'search_anime_yes',
+										},
+										{
+											type: 2,
+											label: 'No',
+											style: 4,
+											custom_id: 'search_anime_no',
+										},
+										{
+											type: 2,
+											label: 'See Synopsis',
+											style: 2,
+											custom_id: 'search_anime_see_synopsis',
+										},
+									],
+								},
+							],
+							embeds: [],
+							allowed_mentions: { parse: [] },
+						},
+					});
 				}
 
 				case 'button': {
@@ -221,7 +295,7 @@ app.post('/', async (c) => {
 							Authorization: `${CLICKUP_TOKEN}`,
 						},
 					});
-					const spacelist = (await req.json()) as Interfaces.Space; // fix this
+					const spacelist = (await req.json()) as Interfaces.Space;
 					const { spaces } = spacelist;
 					let msg = `Here are the spaces we found inside workspace ID ${team_id}:\n`;
 					for (let i = 0; i < spaces.length; i++) {
@@ -242,7 +316,7 @@ app.post('/', async (c) => {
 							Authorization: `${CLICKUP_TOKEN}`,
 						},
 					});
-					const folderlist = (await req.json()) as Interfaces.Folder; // fix this
+					const folderlist = (await req.json()) as Interfaces.Folder;
 					const { folders } = folderlist;
 					let msg = `Here are the folders we found inside space ID ${space_id}:\n`;
 					for (let i = 0; i < folders.length; i++) {
