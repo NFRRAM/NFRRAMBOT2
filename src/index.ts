@@ -5,7 +5,7 @@ import { discordVerify } from './helpers'; // No need to look here
 // import { parseBody } from 'hono/utils/body'; // apparently not used
 import * as Interfaces from './interfaces';
 import * as functions from './functions';
-import { renderToString } from 'hono/jsx/dom/server';
+// import { renderToString } from 'hono/jsx/dom/server'; //idk where this came from
 
 type Bindings = {
 	DISCORD_APP_ID: string;
@@ -138,10 +138,52 @@ app.post('/', async (c) => {
 					// const query = new URLSearchParams({ id: `${anime_storage}` });
 					const jikanreq = await fetch(`https://api.jikan.moe/v4/anime/${anime_storage}`);
 					const anime = (await jikanreq.json()) as Interfaces.JikanSingleAnimePayload; //note this is a different interface
-					const closest_anime = JSON.stringify(anime.data.title_english); //gets the english title of the anime
+					const anime_name = JSON.stringify(anime.data.title); //gets the title of the anime
 					const score = JSON.stringify(anime.data.score); //gets the score of the anime
 					let synopsis = anime.data.synopsis; //gets the synopsis of the anime
-					const msg = `English Title: ${closest_anime}. \n\nIt has a score of ${score} on MyAnimeList.\n\nSynopsis: ${synopsis}`;
+					const msg = `Title: ${anime_name}. \n\nIt has a score of ${score} on MyAnimeList.\n\nSynopsis: ${synopsis}`;
+					return c.json(functions.sendMessage(msg));
+				}
+
+				case 'search_anime_see_synopsis': {
+					// Not using followup messages yet
+					const jikanreq = await fetch(`https://api.jikan.moe/v4/anime/${anime_storage}`);
+					const anime = (await jikanreq.json()) as Interfaces.JikanSingleAnimePayload; //note this is a different interface
+					const synopsis = anime.data.synopsis; //gets the synopsis of the anime
+					const msg = `Synopsis: ${synopsis}\n\nIs this the anime you were looking for?`;
+					return c.json({
+						type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+						data: {
+							tts: false,
+							content: msg,
+							components: [
+								{
+									type: 1,
+									components: [
+										{
+											type: 2,
+											label: 'Yes',
+											style: 3,
+											custom_id: 'search_anime_yes',
+										},
+										{
+											type: 2,
+											label: 'No',
+											style: 4,
+											custom_id: 'search_anime_no',
+										},
+									],
+								},
+							],
+							embeds: [],
+							allowed_mentions: { parse: [] },
+						},
+					});
+				}
+
+				case 'search_anime_no': {
+					// Not using followup messages yet
+					const msg = `Sorry nalang pre`;
 					return c.json(functions.sendMessage(msg));
 				}
 			}
@@ -162,7 +204,7 @@ app.post('/', async (c) => {
 					const { options } = data;
 					const n = functions.findObjValueFromObjList('n', options) ?? 1;
 					const jikanreq = await fetch(`https://api.jikan.moe/v4/top/anime`);
-					const anime = (await jikanreq.json()) as Interfaces.JikanTopAnimePayload; // fix this
+					const anime = (await jikanreq.json()) as Interfaces.JikanMultiAnimePayload; // fix this
 					const place = (n as number) - 1; //fix this n as number stuff, apparently bad practice, ideally maybe 3 different functions acc to jai
 					const topAnime = JSON.stringify(anime.data[place].title_english); //gets the english title of the #n top anime
 					const msg = `The number ${n} top anime is ${topAnime}`;
@@ -175,11 +217,9 @@ app.post('/', async (c) => {
 					const name = functions.findObjValueFromObjList('anime', options) ?? '';
 					const query = new URLSearchParams({ q: name as string }); //fix this name as string stuff
 					const jikanreq = await fetch(`https://api.jikan.moe/v4/anime?${query}`);
-					const anime = (await jikanreq.json()) as Interfaces.JikanTopAnimePayload; // might need to change this, check
-					const closest_anime = JSON.stringify(anime.data[0].title_english); //gets the english title of the closest anime
+					const anime = (await jikanreq.json()) as Interfaces.JikanMultiAnimePayload; // might need to change this, check
+					const closest_anime = JSON.stringify(anime.data[0].title); //gets the title of the closest anime
 					const score = JSON.stringify(anime.data[0].score); //gets the score of the closest anime
-					let synopsis = anime.data[0].synopsis; //gets the synopsis of the closest anime
-					// console.log(synopsis);
 					anime_storage = anime.data[0].mal_id;
 					INTERACTION_TOKEN = body.token;
 					const msg = `Did you mean ${closest_anime} with a score of ${score}?`;

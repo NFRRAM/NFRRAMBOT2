@@ -184,7 +184,7 @@ interface Folder {
 	];
 }
 
-interface JikanTopAnimePayload {
+interface JikanMultiAnimePayload {
 	data: [
 		{
 			mal_id: number;
@@ -457,4 +457,4 @@ interface JikanSingleAnimePayload {
 	};
 }
 
-export type { Workspace, Space, Folder, DiscordBotResponse, DiscordOption, JikanTopAnimePayload, JikanSingleAnimePayload };
+export type { Workspace, Space, Folder, DiscordBotResponse, DiscordOption, JikanMultiAnimePayload, JikanSingleAnimePayload };
